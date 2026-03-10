@@ -207,6 +207,21 @@
           </div>
 
           <div class="modal-field">
+            <label>ニュースの分野 (標準)</label>
+            <select id="default-category-select">
+              <option value="general">総合 (General)</option>
+              <option value="world">国際 (World)</option>
+              <option value="nation">国内 (Nation)</option>
+              <option value="business">ビジネス (Business)</option>
+              <option value="technology">テクノロジー (Technology)</option>
+              <option value="entertainment">エンタメ (Entertainment)</option>
+              <option value="sports">スポーツ (Sports)</option>
+              <option value="science">科学 (Science)</option>
+              <option value="health">健康 (Health)</option>
+            </select>
+          </div>
+
+          <div class="modal-field">
             <label>翻訳用 言語 (標準)</label>
             <select id="default-lang-select">
               <option value="ja">日本語</option>
@@ -255,6 +270,7 @@
     <script>
       let GNEWS_API_KEY = localStorage.getItem('GNEWS_API_KEY') || '';
       let DEFAULT_COUNTRY = localStorage.getItem('DEFAULT_COUNTRY') || 'jp';
+      let DEFAULT_CATEGORY = localStorage.getItem('DEFAULT_CATEGORY') || 'general';
       let DEFAULT_LANG = localStorage.getItem('DEFAULT_LANG') || 'ja';
       let CORS_PROXY = localStorage.getItem('CORS_PROXY') || '';
       let USE_INTERNAL_PROXY = localStorage.getItem('USE_INTERNAL_PROXY') !== 'false'; // Default to true
@@ -265,6 +281,7 @@
       const apiModal = document.getElementById('api-modal');
       const apiKeyInput = document.getElementById('api-key-input');
       const countrySelect = document.getElementById('default-country-select');
+      const categorySelect = document.getElementById('default-category-select');
       const langSelect = document.getElementById('default-lang-select');
       const corsProxyInput = document.getElementById('cors-proxy-input');
       const internalProxyCheck = document.getElementById('use-internal-proxy');
@@ -277,6 +294,7 @@
         lucide.createIcons();
         apiKeyInput.value = GNEWS_API_KEY;
         countrySelect.value = DEFAULT_COUNTRY;
+        categorySelect.value = DEFAULT_CATEGORY;
         langSelect.value = DEFAULT_LANG;
         corsProxyInput.value = CORS_PROXY;
         internalProxyCheck.checked = USE_INTERNAL_PROXY;
@@ -310,11 +328,13 @@
             localStorage.setItem('GNEWS_API_KEY', newKey);
           }
           DEFAULT_COUNTRY = countrySelect.value;
+          DEFAULT_CATEGORY = categorySelect.value;
           DEFAULT_LANG = langSelect.value;
           CORS_PROXY = corsProxyInput.value.trim();
           USE_INTERNAL_PROXY = internalProxyCheck.checked;
           
           localStorage.setItem('DEFAULT_COUNTRY', DEFAULT_COUNTRY);
+          localStorage.setItem('DEFAULT_CATEGORY', DEFAULT_CATEGORY);
           localStorage.setItem('DEFAULT_LANG', DEFAULT_LANG);
           localStorage.setItem('CORS_PROXY', CORS_PROXY);
           localStorage.setItem('USE_INTERNAL_PROXY', USE_INTERNAL_PROXY);
@@ -363,7 +383,7 @@
         for(let i=0; i<6; i++) newsGrid.innerHTML += '<div class="skeleton-card"></div>';
         
         try {
-          const apiURL = `https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=${country}&max=12&apikey=${GNEWS_API_KEY}`;
+          const apiURL = `https://gnews.io/api/v4/top-headlines?category=${DEFAULT_CATEGORY}&lang=${lang}&country=${country}&max=12&apikey=${GNEWS_API_KEY}`;
           let fetchURL = apiURL;
           
           if (USE_INTERNAL_PROXY) {
