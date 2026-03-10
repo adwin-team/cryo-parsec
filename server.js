@@ -9,8 +9,8 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.static(process.cwd()));
 
-// Proxy endpoint for GNews API
-app.get('/api/proxy', async (req, res) => {
+// Proxy endpoint for GNews API (Regex to match any path ending in /api/proxy)
+app.get(/^\/.*api\/proxy$/, async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) {
     return res.status(400).json({ error: 'URL parameter is required' });

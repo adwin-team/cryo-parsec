@@ -360,7 +360,8 @@
           let fetchURL = apiURL;
           
           if (USE_INTERNAL_PROXY) {
-            fetchURL = `/api/proxy?url=${encodeURIComponent(apiURL)}`;
+            // Use relative path to support subdirectory proxy forwarding (e.g., example.com/myapp/)
+            fetchURL = `./api/proxy?url=${encodeURIComponent(apiURL)}`;
           } else if (CORS_PROXY) {
             fetchURL = (CORS_PROXY.endsWith('/') ? CORS_PROXY : CORS_PROXY + '/') + apiURL;
           }
