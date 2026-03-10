@@ -105,6 +105,34 @@
 
       .glass-footer { padding: 2rem; text-align: center; border-top: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; }
       
+      /* Modal Styles */
+      .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+        display: flex; align-items: center; justify-content: center; z-index: 1000;
+        opacity: 0; transition: opacity 0.3s ease;
+      }
+      .modal-content {
+        background: var(--card-bg); border: 1px solid var(--glass-border);
+        padding: 2.5rem; border-radius: 1.5rem; width: 90%; max-width: 500px;
+        text-align: center;
+      }
+      .modal-content h2 { margin-bottom: 1rem; font-family: var(--font-display); }
+      .modal-content p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+      .modal-content input {
+        width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem;
+        background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+        color: white; margin-bottom: 1.5rem; font-family: inherit;
+      }
+      .modal-actions { display: flex; gap: 1rem; justify-content: center; }
+      .primary-btn {
+        background: var(--primary); color: white; border: none;
+        padding: 0.75rem 1.5rem; border-radius: 0.75rem; cursor: pointer;
+        font-weight: 600; transition: var(--transition);
+      }
+      .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(79, 70, 229, 0.4); }
+      .text-btn { background: transparent; color: var(--text-muted); border: none; cursor: pointer; }
+
       @media (max-width: 768px) {
         .glass-header { flex-direction: column; gap: 1rem; }
         .country-selector { overflow-x: auto; width: 100%; padding-bottom: 0.5rem; }
@@ -127,8 +155,22 @@
           <button class="country-btn" data-country="fr" data-lang="fr">France</button>
           <button class="country-btn" data-country="de" data-lang="de">Germany</button>
           <button class="country-btn" data-country="cn" data-lang="zh">中国</button>
+          <button id="settings-btn" class="country-btn" title="API設定"><i data-lucide="settings" size="16"></i></button>
         </nav>
       </header>
+
+      <!-- API Key Modal -->
+      <div id="api-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card">
+          <h2>API設定</h2>
+          <p>ニュースを取得するには <a href="https://gnews.io/" target="_blank">GNews</a> のAPIキーが必要です。</p>
+          <input type="text" id="api-key-input" placeholder="APIキーを入力してください" />
+          <div class="modal-actions">
+            <button id="save-api-key" class="primary-btn">保存して更新</button>
+            <button id="close-modal" class="text-btn">閉じる</button>
+          </div>
+        </div>
+      </div>
       <main class="content-area">
         <div class="status-bar">
           <span class="live-indicator"><span class="pulse"></span> LIVE</span>
@@ -143,44 +185,100 @@
     </div>
 
     <script>
-      const GNEWS_API_KEY = '5f89eb8a5d33f268b8156108139cd35e';
+      let GNEWS_API_KEY = localStorage.getItem('GNEWS_API_KEY') || '';
       const newsGrid = document.getElementById('news-grid');
       const regionDisplay = document.querySelector('.current-region');
       const lastUpdated = document.getElementById('last-updated');
+      const apiModal = document.getElementById('api-modal');
+      const apiKeyInput = document.getElementById('api-key-input');
+      
       let currentCountry = 'jp';
       let currentLang = 'ja';
 
       function init() {
         lucide.createIcons();
-        fetchNews(currentCountry, currentLang);
+        apiKeyInput.value = GNEWS_API_KEY;
+
+        if (!GNEWS_API_KEY) {
+          showModal();
+        } else {
+          fetchNews(currentCountry, currentLang);
+        }
         
-        document.querySelectorAll('.country-btn').forEach(btn => {
+        // Settings Button
+        document.getElementById('settings-btn').addEventListener('click', showModal);
+        document.getElementById('close-modal').addEventListener('click', hideModal);
+        document.getElementById('save-api-key').addEventListener('click', () => {
+          const newKey = apiKeyInput.value.trim();
+          if (newKey) {
+            GNEWS_API_KEY = newKey;
+            localStorage.setItem('GNEWS_API_KEY', newKey);
+            hideModal();
+            fetchNews(currentCountry, currentLang);
+          }
+        });
+
+        document.querySelectorAll('.country-btn[data-country]').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            const country = e.target.dataset.country;
-            const lang = e.target.dataset.lang;
+            const country = e.currentTarget.dataset.country;
+            const lang = e.currentTarget.dataset.lang;
             if (country === currentCountry) return;
             
             document.querySelectorAll('.country-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
+            e.currentTarget.classList.add('active');
             
             currentCountry = country;
             currentLang = lang;
-            regionDisplay.textContent = `${e.target.textContent} - 最新ニュース`;
+            regionDisplay.textContent = `${e.currentTarget.textContent} - 最新ニュース`;
             fetchNews(currentCountry, currentLang);
           });
         });
       }
 
+      function showModal() {
+        apiModal.style.display = 'flex';
+        gsap.to(apiModal, { opacity: 1, duration: 0.3 });
+      }
+
+      function hideModal() {
+        gsap.to(apiModal, { opacity: 0, duration: 0.3, onComplete: () => {
+          apiModal.style.display = 'none';
+        }});
+      }
+
       async function fetchNews(country, lang) {
+        if (!GNEWS_API_KEY) {
+          showModal();
+          return;
+        }
+
         newsGrid.innerHTML = '';
         for(let i=0; i<6; i++) newsGrid.innerHTML += '<div class="skeleton-card"></div>';
         
         try {
           const res = await fetch(`https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=${country}&max=12&apikey=${GNEWS_API_KEY}`);
+          
+          if (res.status === 401 || res.status === 403) {
+            throw new Error('Unauthorized');
+          }
+
           const data = await res.json();
-          if (data.articles) renderArticles(data.articles);
+          if (data.articles) {
+            renderArticles(data.articles);
+          } else {
+            throw new Error('No articles');
+          }
         } catch (err) {
-          newsGrid.innerHTML = '<p>ニュースの取得に失敗しました。</p>';
+          if (err.message === 'Unauthorized') {
+            newsGrid.innerHTML = `
+              <div style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                <p style="margin-bottom: 1rem; color: #ef4444;">APIキーが無効、または期限切れです。</p>
+                <button onclick="showModal()" class="primary-btn">APIキーを設定する</button>
+              </div>
+            `;
+          } else {
+            newsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">ニュースの取得に失敗しました。</p>';
+          }
         }
       }
 
@@ -198,7 +296,7 @@
               <p class="card-desc">${art.description || ''}</p>
               <div class="card-footer">
                 <span class="card-time">${new Date(art.publishedAt).toLocaleTimeString()}</span>
-                <a href="${art.url}" target="_blank" class="read-more">記事を読む <i data-lucide="arrow-right"></i></a>
+                <a href="${art.url}" target="_blank" class="read-more">記事を読む <i data-lucide="arrow-right" size="16"></i></a>
               </div>
             </div>
           `;
