@@ -137,6 +137,23 @@
       .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(79, 70, 229, 0.4); }
       .text-btn { background: transparent; color: var(--text-muted); border: none; cursor: pointer; }
 
+      .modal-content input, .modal-content select {
+        width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem;
+        background: #1e293b; border: 1px solid var(--glass-border);
+        color: white; margin-bottom: 1rem; font-family: inherit;
+        appearance: none;
+      }
+      .modal-field { text-align: left; margin-bottom: 1rem; }
+      .modal-field label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+      .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+      .translation-badge {
+        font-size: 0.7rem; background: rgba(79, 70, 229, 0.2);
+        color: var(--primary); padding: 0.2rem 0.5rem; border-radius: 0.4rem;
+        text-transform: uppercase; font-weight: 600; margin-left: 0.5rem;
+      }
+      .translated-text { color: var(--text-main); font-size: 0.95rem; margin-top: 0.5rem; font-weight: 400; border-left: 2px solid var(--primary); padding-left: 0.75rem; }
+      .original-text { opacity: 0.7; font-size: 0.85rem; }
+
       @media (max-width: 768px) {
         .glass-header { flex-direction: column; gap: 1rem; }
         .country-selector { overflow-x: auto; width: 100%; padding-bottom: 0.5rem; }
@@ -166,11 +183,40 @@
       <!-- API Key Modal -->
       <div id="api-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content glass-card">
-          <h2>API設定</h2>
-          <p>ニュースを取得するには <a href="https://gnews.io/" target="_blank">GNews</a> のAPIキーが必要です。</p>
-          <input type="text" id="api-key-input" placeholder="APIキーを入力してください" />
+          <h2>アプリ設定</h2>
+          
+          <div class="modal-field">
+            <label>GNews APIキー</label>
+            <input type="text" id="api-key-input" placeholder="APIキーを入力" />
+          </div>
+
+          <div class="modal-field">
+            <label>標準の国 (起動時)</label>
+            <select id="default-country-select">
+              <option value="jp">日本</option>
+              <option value="us">USA</option>
+              <option value="gb">UK</option>
+              <option value="fr">France</option>
+              <option value="de">Germany</option>
+              <option value="cn">中国</option>
+            </select>
+          </div>
+
+          <div class="modal-field">
+            <label>翻訳用 言語 (標準)</label>
+            <select id="default-lang-select">
+              <option value="ja">日本語</option>
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="zh">中国語</option>
+            </select>
+          </div>
+
+          <p style="font-size: 0.75rem;">※ APIキーは <a href="https://gnews.io/" target="_blank">GNews</a> で取得可能です。</p>
+          
           <div class="modal-actions">
-            <button id="save-api-key" class="primary-btn">保存して更新</button>
+            <button id="save-settings" class="primary-btn">保存して更新</button>
             <button id="close-modal" class="text-btn">閉じる</button>
           </div>
         </div>
@@ -190,18 +236,34 @@
 
     <script>
       let GNEWS_API_KEY = localStorage.getItem('GNEWS_API_KEY') || '';
+      let DEFAULT_COUNTRY = localStorage.getItem('DEFAULT_COUNTRY') || 'jp';
+      let DEFAULT_LANG = localStorage.getItem('DEFAULT_LANG') || 'ja';
+      
       const newsGrid = document.getElementById('news-grid');
       const regionDisplay = document.querySelector('.current-region');
       const lastUpdated = document.getElementById('last-updated');
       const apiModal = document.getElementById('api-modal');
       const apiKeyInput = document.getElementById('api-key-input');
+      const countrySelect = document.getElementById('default-country-select');
+      const langSelect = document.getElementById('default-lang-select');
       
-      let currentCountry = 'jp';
-      let currentLang = 'ja';
+      let currentCountry = DEFAULT_COUNTRY;
+      let currentLang = 'ja'; // Will be set by button data
 
       function init() {
         lucide.createIcons();
         apiKeyInput.value = GNEWS_API_KEY;
+        countrySelect.value = DEFAULT_COUNTRY;
+        langSelect.value = DEFAULT_LANG;
+
+        // Set initial active button
+        const initialBtn = document.querySelector(`.country-btn[data-country="${currentCountry}"]`);
+        if (initialBtn) {
+          document.querySelectorAll('.country-btn').forEach(b => b.classList.remove('active'));
+          initialBtn.classList.add('active');
+          currentLang = initialBtn.dataset.lang;
+          regionDisplay.textContent = `${initialBtn.textContent} - 最新ニュース`;
+        }
 
         if (!GNEWS_API_KEY) {
           showModal();
@@ -209,17 +271,23 @@
           fetchNews(currentCountry, currentLang);
         }
         
-        // Settings Button
         document.getElementById('settings-btn').addEventListener('click', showModal);
         document.getElementById('close-modal').addEventListener('click', hideModal);
-        document.getElementById('save-api-key').addEventListener('click', () => {
+        document.getElementById('save-settings').addEventListener('click', () => {
           const newKey = apiKeyInput.value.trim();
           if (newKey) {
             GNEWS_API_KEY = newKey;
             localStorage.setItem('GNEWS_API_KEY', newKey);
-            hideModal();
-            fetchNews(currentCountry, currentLang);
           }
+          DEFAULT_COUNTRY = countrySelect.value;
+          DEFAULT_LANG = langSelect.value;
+          localStorage.setItem('DEFAULT_COUNTRY', DEFAULT_COUNTRY);
+          localStorage.setItem('DEFAULT_LANG', DEFAULT_LANG);
+          
+          hideModal();
+          
+          // Apply changes immediately (reload for current country)
+          fetchNews(currentCountry, currentLang);
         });
 
         document.querySelectorAll('.country-btn[data-country]').forEach(btn => {
@@ -268,7 +336,7 @@
 
           const data = await res.json();
           if (data.articles) {
-            renderArticles(data.articles);
+            renderArticles(data.articles, lang);
           } else {
             throw new Error('No articles');
           }
@@ -286,18 +354,50 @@
         }
       }
 
-      function renderArticles(articles) {
+      async function renderArticles(articles, newsLang) {
         newsGrid.innerHTML = '';
-        articles.forEach((art, i) => {
+        
+        const needsTranslation = newsLang !== DEFAULT_LANG;
+
+        for (const [i, art] of articles.entries()) {
           const card = document.createElement('div');
           card.className = 'news-card';
           card.style.opacity = 0;
+          
+          let titleDisplay = `<h3 class="card-title">${art.title}</h3>`;
+          let descDisplay = `<p class="card-desc">${art.description || ''}</p>`;
+
+          if (needsTranslation && art.title) {
+            try {
+              // Parallel fetch for description if available
+              const [trTitle, trDesc] = await Promise.all([
+                translateText(art.title, newsLang, DEFAULT_LANG),
+                art.description ? translateText(art.description, newsLang, DEFAULT_LANG) : Promise.resolve('')
+              ]);
+              
+              titleDisplay = `
+                <h3 class="card-title">
+                  <span class="original-text">${art.title}</span>
+                  <div class="translated-text">${trTitle} <span class="translation-badge">TR</span></div>
+                </h3>
+              `;
+              descDisplay = `
+                <div class="card-desc">
+                  <span class="original-text">${art.description || ''}</span>
+                  <p class="translated-text">${trDesc}</p>
+                </div>
+              `;
+            } catch (e) {
+              console.error('Translation failed', e);
+            }
+          }
+
           card.innerHTML = `
             <div class="card-img-wrapper"><img src="${art.image || 'https://via.placeholder.com/800x450/1e293b/94a3b8?text=Global+News'}" alt=""></div>
             <div class="card-content">
               <span class="card-source">${art.source.name}</span>
-              <h3 class="card-title">${art.title}</h3>
-              <p class="card-desc">${art.description || ''}</p>
+              ${titleDisplay}
+              ${descDisplay}
               <div class="card-footer">
                 <span class="card-time">${new Date(art.publishedAt).toLocaleTimeString()}</span>
                 <a href="${art.url}" target="_blank" class="read-more">記事を読む <i data-lucide="arrow-right" size="16"></i></a>
@@ -306,9 +406,21 @@
           `;
           newsGrid.appendChild(card);
           gsap.to(card, { opacity: 1, y: 0, from: {y: 20}, duration: 0.6, delay: i * 0.1 });
-        });
+        }
+        
         lucide.createIcons();
         lastUpdated.textContent = `最終更新: ${new Date().toLocaleTimeString()}`;
+      }
+
+      async function translateText(text, from, to) {
+        if (!text) return '';
+        try {
+          const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`);
+          const data = await res.json();
+          return data.responseData.translatedText || text;
+        } catch (e) {
+          return text;
+        }
       }
 
       init();
