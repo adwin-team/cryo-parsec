@@ -210,6 +210,20 @@
             </select>
           </div>
 
+          <div class="modal-field">
+            <label>CORSプロキシ設定</label>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: white; font-size: 0.9rem;">
+                <input type="checkbox" id="use-internal-proxy" style="width: auto; margin-bottom: 0;"> 内蔵プロキシを使用する (推奨)
+              </label>
+              <div id="external-proxy-field" style="display: none; margin-top: 0.5rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">カスタムプロキシURL</label>
+                <input type="text" id="cors-proxy-input" placeholder="https://example.com/proxy/" style="margin-bottom: 0;" />
+              </div>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem;">※ 「内蔵プロキシ」を有効にすると、サーバー経由で安全にニュースを取得します。</p>
+          </div>
+
           <p style="font-size: 0.75rem;">※ APIキーは <a href="https://gnews.io/" target="_blank">GNews</a> で取得可能です。</p>
           
           <div class="modal-actions">
@@ -235,6 +249,8 @@
       let GNEWS_API_KEY = localStorage.getItem('GNEWS_API_KEY') || '';
       let DEFAULT_COUNTRY = localStorage.getItem('DEFAULT_COUNTRY') || 'jp';
       let DEFAULT_LANG = localStorage.getItem('DEFAULT_LANG') || 'ja';
+      let CORS_PROXY = localStorage.getItem('CORS_PROXY') || '';
+      let USE_INTERNAL_PROXY = localStorage.getItem('USE_INTERNAL_PROXY') !== 'false'; // Default to true
       
       const newsGrid = document.getElementById('news-grid');
       const regionDisplay = document.querySelector('.current-region');
@@ -243,6 +259,9 @@
       const apiKeyInput = document.getElementById('api-key-input');
       const countrySelect = document.getElementById('default-country-select');
       const langSelect = document.getElementById('default-lang-select');
+      const corsProxyInput = document.getElementById('cors-proxy-input');
+      const internalProxyCheck = document.getElementById('use-internal-proxy');
+      const externalProxyField = document.getElementById('external-proxy-field');
       
       let currentCountry = DEFAULT_COUNTRY;
       let currentLang = 'ja'; // Will be set by button data
@@ -252,6 +271,13 @@
         apiKeyInput.value = GNEWS_API_KEY;
         countrySelect.value = DEFAULT_COUNTRY;
         langSelect.value = DEFAULT_LANG;
+        corsProxyInput.value = CORS_PROXY;
+        internalProxyCheck.checked = USE_INTERNAL_PROXY;
+        externalProxyField.style.display = USE_INTERNAL_PROXY ? 'none' : 'block';
+
+        internalProxyCheck.addEventListener('change', (e) => {
+          externalProxyField.style.display = e.target.checked ? 'none' : 'block';
+        });
 
         // Set initial active button
         const initialBtn = document.querySelector(`.country-btn[data-country="${currentCountry}"]`);
@@ -278,8 +304,13 @@
           }
           DEFAULT_COUNTRY = countrySelect.value;
           DEFAULT_LANG = langSelect.value;
+          CORS_PROXY = corsProxyInput.value.trim();
+          USE_INTERNAL_PROXY = internalProxyCheck.checked;
+          
           localStorage.setItem('DEFAULT_COUNTRY', DEFAULT_COUNTRY);
           localStorage.setItem('DEFAULT_LANG', DEFAULT_LANG);
+          localStorage.setItem('CORS_PROXY', CORS_PROXY);
+          localStorage.setItem('USE_INTERNAL_PROXY', USE_INTERNAL_PROXY);
           
           hideModal();
           
@@ -325,7 +356,16 @@
         for(let i=0; i<6; i++) newsGrid.innerHTML += '<div class="skeleton-card"></div>';
         
         try {
-          const res = await fetch(`https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=${country}&max=12&apikey=${GNEWS_API_KEY}`);
+          const apiURL = `https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=${country}&max=12&apikey=${GNEWS_API_KEY}`;
+          let fetchURL = apiURL;
+          
+          if (USE_INTERNAL_PROXY) {
+            fetchURL = `/api/proxy?url=${encodeURIComponent(apiURL)}`;
+          } else if (CORS_PROXY) {
+            fetchURL = (CORS_PROXY.endsWith('/') ? CORS_PROXY : CORS_PROXY + '/') + apiURL;
+          }
+          
+          const res = await fetch(fetchURL);
           
           if (res.status === 401 || res.status === 403) {
             throw new Error('Unauthorized');

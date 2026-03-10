@@ -14,12 +14,12 @@ then
 fi
 
 # 2. Start Local Server
-echo "[1/2] Starting local server to resolve CORS issues..."
-# We use npx -y http-server for simplicity
-# It will automatically serve index.html at localhost:8080 (default)
+echo "[1/2] Starting local server with built-in CORS proxy..."
+# We use a custom Node.js/Express server
+# It serves index.html and provides the /api/proxy endpoint
 
 # Use & to run in background so we can show a message
-npx -y http-server . -p 8080 -o &
+npm start &
 
 echo "----------------------------------------"
 echo "  App is running at http://localhost:8080"
